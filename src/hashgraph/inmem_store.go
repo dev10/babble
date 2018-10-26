@@ -32,7 +32,7 @@ func NewInmemStore(participants *peers.Peers, cacheSize int) *InmemStore {
 		rootsByParticipant[pk] = root
 	}
 
-	return &InmemStore{
+	store := &InmemStore{
 		cacheSize:              cacheSize,
 		participants:           participants,
 		eventCache:             cm.NewLRU(cacheSize, nil),
@@ -46,6 +46,20 @@ func NewInmemStore(participants *peers.Peers, cacheSize int) *InmemStore {
 		lastBlock:              -1,
 		lastConsensusEvents:    map[string]string{},
 	}
+
+	participants.OnNewPeer(func(peer *peers.Peer) {
+		root := NewBaseRoot(peer.ID)
+		store.rootsByParticipant[peer.PubKeyHex] = root
+		store.rootsBySelfParent = nil
+		store.RootsBySelfParent()
+
+		old := store.participantEventsCache
+		store.participantEventsCache = NewParticipantEventsCache(cacheSize, participants)
+		store.participantEventsCache.Import(old)
+	})
+
+	return store
+
 }
 
 func (s *InmemStore) CacheSize() int {
@@ -59,15 +73,18 @@ func (s *InmemStore) Participants() (*peers.Peers, error) {
 func (s *InmemStore) RootsBySelfParent() (map[string]Root, error) {
 	if s.rootsBySelfParent == nil {
 		s.rootsBySelfParent = make(map[string]Root)
+
 		for _, root := range s.rootsByParticipant {
 			s.rootsBySelfParent[root.SelfParent.Hash] = root
 		}
 	}
+
 	return s.rootsBySelfParent, nil
 }
 
 func (s *InmemStore) GetEvent(key string) (Event, error) {
 	res, ok := s.eventCache.Get(key)
+
 	if !ok {
 		return Event{}, cm.NewStoreErr("EventCache", cm.KeyNotFound, key)
 	}
@@ -278,6 +295,11 @@ func (s *InmemStore) Reset(roots map[string]Root) error {
 	err := s.participantEventsCache.Reset()
 	s.lastRound = -1
 	s.lastBlock = -1
+
+	if _, err := s.RootsBySelfParent(); err != nil {
+		return err
+	}
+
 	return err
 }
 

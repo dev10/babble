@@ -4,21 +4,16 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"os"
-	"sort"
-	"testing"
-
-	"github.com/mosaicnetworks/babble/src/peers"
-
-	"github.com/sirupsen/logrus"
-
-	"strings"
-
 	"reflect"
-
-	"math"
+	"sort"
+	"strconv"
+	"strings"
+	"testing"
 
 	"github.com/mosaicnetworks/babble/src/common"
 	"github.com/mosaicnetworks/babble/src/crypto"
+	"github.com/mosaicnetworks/babble/src/peers"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -37,7 +32,9 @@ type TestNode struct {
 
 func NewTestNode(key *ecdsa.PrivateKey, id int) TestNode {
 	pub := crypto.FromECDSAPub(&key.PublicKey)
+
 	ID := common.Hash32(pub)
+
 	node := TestNode{
 		ID:     ID,
 		Key:    key,
@@ -45,13 +42,17 @@ func NewTestNode(key *ecdsa.PrivateKey, id int) TestNode {
 		PubHex: fmt.Sprintf("0x%X", pub),
 		Events: []Event{},
 	}
+
 	return node
 }
 
 func (node *TestNode) signAndAddEvent(event Event, name string, index map[string]string, orderedEvents *[]Event) {
 	event.Sign(node.Key)
+
 	node.Events = append(node.Events, event)
+
 	index[name] = event.Hex()
+
 	*orderedEvents = append(*orderedEvents, event)
 }
 
@@ -84,17 +85,24 @@ func testLogger(t testing.TB) *logrus.Entry {
 
 func initHashgraphNodes(n int) ([]TestNode, map[string]string, *[]Event, *peers.Peers) {
 	index := make(map[string]string)
+
 	nodes := []TestNode{}
+
 	orderedEvents := &[]Event{}
+
 	keys := map[string]*ecdsa.PrivateKey{}
 
 	participants := peers.NewPeers()
 
 	for i := 0; i < n; i++ {
 		key, _ := crypto.GenerateECDSAKey()
+
 		pub := crypto.FromECDSAPub(&key.PublicKey)
+
 		pubHex := fmt.Sprintf("0x%X", pub)
+
 		participants.AddPeer(peers.NewPeer(pubHex, ""))
+
 		keys[pubHex] = key
 	}
 
@@ -119,9 +127,12 @@ func playEvents(plays []play, nodes []TestNode, index map[string]string, ordered
 
 func createHashgraph(db bool, orderedEvents *[]Event, participants *peers.Peers, logger *logrus.Entry) *Hashgraph {
 	var store Store
+
 	if db {
 		var err error
+
 		store, err = NewBadgerStore(participants, cacheSize, badgerDir)
+
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -133,7 +144,7 @@ func createHashgraph(db bool, orderedEvents *[]Event, participants *peers.Peers,
 
 	for i, ev := range *orderedEvents {
 		if err := hashgraph.InsertEvent(ev, true); err != nil {
-			fmt.Printf("ERROR inserting event %d: %s\n", i, err)
+			logger.Fatalf("ERROR inserting event %d: %s\n", i, err)
 		}
 	}
 
@@ -146,12 +157,24 @@ func initHashgraphFull(plays []play, db bool, n int, logger *logrus.Entry) (*Has
 	// Needed to have sorted nodes based on participants hash32
 	for i, peer := range participants.ToPeerSlice() {
 		event := NewEvent(nil, nil, []string{rootSelfParent(peer.ID), ""}, nodes[i].Pub, 0)
+
 		nodes[i].signAndAddEvent(event, fmt.Sprintf("e%d", i), index, orderedEvents)
 	}
 
 	playEvents(plays, nodes, index, orderedEvents)
 
 	hashgraph := createHashgraph(db, orderedEvents, participants, logger)
+
+	// Add reference to each participants' root event
+	for i, peer := range participants.ToPeerSlice() {
+		root, err := hashgraph.Store.GetRoot(peer.PubKeyHex)
+
+		if err != nil {
+			panic(err)
+		}
+
+		index["r"+strconv.Itoa(i)] = root.SelfParent.Hash
+	}
 
 	return hashgraph, index, orderedEvents
 }
@@ -170,6 +193,8 @@ s00 |  s20
 e01 |   |
 | \ |   |
 e0  e1  e2
+|   |   |
+r0  r1  r2
 0   1   2
 */
 func initHashgraph(t *testing.T) (*Hashgraph, map[string]string) {
@@ -185,15 +210,7 @@ func initHashgraph(t *testing.T) (*Hashgraph, map[string]string) {
 	h, index, orderedEvents := initHashgraphFull(plays, false, n, testLogger(t))
 
 	for i, ev := range *orderedEvents {
-		if err := h.initEventCoordinates(&ev); err != nil {
-			t.Fatalf("%d: %s", i, err)
-		}
-
 		if err := h.Store.SetEvent(ev); err != nil {
-			t.Fatalf("%d: %s", i, err)
-		}
-
-		if err := h.updateAncestorFirstDescendant(ev); err != nil {
 			t.Fatalf("%d: %s", i, err)
 		}
 	}
@@ -235,13 +252,21 @@ func TestAncestor(t *testing.T) {
 		ancestryItem{"e0", "", false, true},
 		ancestryItem{"s00", "", false, true},
 		ancestryItem{"e12", "", false, true},
+		//root events
+		ancestryItem{"e1", "r1", true, false},
+		ancestryItem{"e20", "r1", true, false},
+		ancestryItem{"e12", "r0", true, false},
+		ancestryItem{"s20", "r1", false, false},
+		ancestryItem{"r0", "r1", false, false},
 	}
 
 	for _, exp := range expected {
 		a, err := h.ancestor(index[exp.descendant], index[exp.ancestor])
+
 		if err != nil && !exp.err {
 			t.Fatalf("Error computing ancestor(%s, %s). Err: %v", exp.descendant, exp.ancestor, err)
 		}
+
 		if a != exp.val {
 			t.Fatalf("ancestor(%s, %s) should be %v, not %v", exp.descendant, exp.ancestor, exp.val, a)
 		}
@@ -267,13 +292,20 @@ func TestSelfAncestor(t *testing.T) {
 		ancestryItem{"e20", "e0", false, false},
 		ancestryItem{"e12", "e2", false, false},
 		ancestryItem{"e20", "e01", false, false},
+		//roots
+		ancestryItem{"e20", "r2", true, false},
+		ancestryItem{"e1", "r1", true, false},
+		ancestryItem{"e1", "r0", false, false},
+		ancestryItem{"r1", "r0", false, false},
 	}
 
 	for _, exp := range expected {
 		a, err := h.selfAncestor(index[exp.descendant], index[exp.ancestor])
+
 		if err != nil && !exp.err {
 			t.Fatalf("Error computing selfAncestor(%s, %s). Err: %v", exp.descendant, exp.ancestor, err)
 		}
+
 		if a != exp.val {
 			t.Fatalf("selfAncestor(%s, %s) should be %v, not %v", exp.descendant, exp.ancestor, exp.val, a)
 		}
@@ -296,9 +328,11 @@ func TestSee(t *testing.T) {
 
 	for _, exp := range expected {
 		a, err := h.see(index[exp.descendant], index[exp.ancestor])
+
 		if err != nil && !exp.err {
 			t.Fatalf("Error computing see(%s, %s). Err: %v", exp.descendant, exp.ancestor, err)
 		}
+
 		if a != exp.val {
 			t.Fatalf("see(%s, %s) should be %v, not %v", exp.descendant, exp.ancestor, exp.val, a)
 		}
@@ -436,9 +470,17 @@ func initRoundHashgraph(t *testing.T) (*Hashgraph, map[string]string) {
 func TestInsertEvent(t *testing.T) {
 	h, index := initRoundHashgraph(t)
 
-	t.Run("Check Event Coordinates", func(t *testing.T) {
+	checkParents := func(e, selfAncestor, ancestor string) bool {
+		ev, err := h.Store.GetEvent(index[e])
 
-		participants := h.Participants.ToPeerSlice()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return ev.SelfParent() == selfAncestor && ev.OtherParent() == ancestor
+	}
+
+	t.Run("Check Event Coordinates", func(t *testing.T) {
 
 		//e0
 		e0, err := h.Store.GetEvent(index["e0"])
@@ -451,25 +493,6 @@ func TestInsertEvent(t *testing.T) {
 			e0.Body.otherParentIndex == -1 &&
 			e0.Body.creatorID == h.Participants.ByPubKey[e0.Creator()].ID) {
 			t.Fatalf("Invalid wire info on e0")
-		}
-
-		expectedFirstDescendants := OrderedEventCoordinates{
-			Index{participants[0].ID, EventCoordinates{index["e0"], 0}},
-			Index{participants[1].ID, EventCoordinates{index["e10"], 1}},
-			Index{participants[2].ID, EventCoordinates{index["e21"], 2}},
-		}
-
-		expectedLastAncestors := OrderedEventCoordinates{
-			Index{participants[0].ID, EventCoordinates{index["e0"], 0}},
-			Index{participants[1].ID, EventCoordinates{"", -1}},
-			Index{participants[2].ID, EventCoordinates{"", -1}},
-		}
-
-		if !reflect.DeepEqual(e0.firstDescendants, expectedFirstDescendants) {
-			t.Fatal("e0 firstDescendants not good")
-		}
-		if !reflect.DeepEqual(e0.lastAncestors, expectedLastAncestors) {
-			t.Fatal("e0 lastAncestors not good")
 		}
 
 		//e21
@@ -490,25 +513,6 @@ func TestInsertEvent(t *testing.T) {
 			t.Fatalf("Invalid wire info on e21")
 		}
 
-		expectedFirstDescendants = OrderedEventCoordinates{
-			Index{participants[0].ID, EventCoordinates{index["e02"], 2}},
-			Index{participants[1].ID, EventCoordinates{index["f1"], 3}},
-			Index{participants[2].ID, EventCoordinates{index["e21"], 2}},
-		}
-
-		expectedLastAncestors = OrderedEventCoordinates{
-			Index{participants[0].ID, EventCoordinates{index["e0"], 0}},
-			Index{participants[1].ID, EventCoordinates{index["e10"], 1}},
-			Index{participants[2].ID, EventCoordinates{index["e21"], 2}},
-		}
-
-		if !reflect.DeepEqual(e21.firstDescendants, expectedFirstDescendants) {
-			t.Fatal("e21 firstDescendants not good")
-		}
-		if !reflect.DeepEqual(e21.lastAncestors, expectedLastAncestors) {
-			t.Fatal("e21 lastAncestors not good")
-		}
-
 		//f1
 		f1, err := h.Store.GetEvent(index["f1"])
 		if err != nil {
@@ -522,23 +526,24 @@ func TestInsertEvent(t *testing.T) {
 			t.Fatalf("Invalid wire info on f1")
 		}
 
-		expectedFirstDescendants = OrderedEventCoordinates{
-			Index{participants[0].ID, EventCoordinates{"", math.MaxInt32}},
-			Index{participants[1].ID, EventCoordinates{index["f1"], 3}},
-			Index{participants[2].ID, EventCoordinates{"", math.MaxInt32}},
+		e0CreatorID := strconv.Itoa(h.Participants.ByPubKey[e0.Creator()].ID)
+
+		type Hierarchy struct {
+			ev, selfAncestor, ancestor string
 		}
 
-		expectedLastAncestors = OrderedEventCoordinates{
-			Index{participants[0].ID, EventCoordinates{index["e02"], 2}},
-			Index{participants[1].ID, EventCoordinates{index["f1"], 3}},
-			Index{participants[2].ID, EventCoordinates{index["e21"], 2}},
+		toCheck := []Hierarchy{
+			Hierarchy{"e0", "Root" + e0CreatorID, ""},
+			Hierarchy{"e10", index["e1"], index["e0"]},
+			Hierarchy{"e21", index["s20"], index["e10"]},
+			Hierarchy{"e02", index["s00"], index["e21"]},
+			Hierarchy{"f1", index["s10"], index["e02"]},
 		}
 
-		if !reflect.DeepEqual(f1.firstDescendants, expectedFirstDescendants) {
-			t.Fatal("f1 firstDescendants not good")
-		}
-		if !reflect.DeepEqual(f1.lastAncestors, expectedLastAncestors) {
-			t.Fatal("f1 lastAncestors not good")
+		for _, v := range toCheck {
+			if !checkParents(v.ev, v.selfAncestor, v.ancestor) {
+				t.Fatal(v.ev + " selfParent not good")
+			}
 		}
 	})
 
@@ -570,6 +575,7 @@ func TestInsertEvent(t *testing.T) {
 		if ple := h.PendingLoadedEvents; ple != 4 {
 			t.Fatalf("PendingLoadedEvents should be 4, not %d", ple)
 		}
+
 	})
 }
 
@@ -577,6 +583,10 @@ func TestReadWireInfo(t *testing.T) {
 	h, index := initRoundHashgraph(t)
 
 	for k, evh := range index {
+		if k[0] == 'r' {
+			continue
+		}
+
 		ev, err := h.Store.GetEvent(evh)
 		if err != nil {
 			t.Fatal(err)
@@ -629,6 +639,14 @@ func TestStronglySee(t *testing.T) {
 		ancestryItem{"e02", "e2", false, false},
 		ancestryItem{"s11", "e02", false, false},
 		ancestryItem{"s11", "", false, true},
+		// root events
+		ancestryItem{"s11", "r1", true, false},
+		ancestryItem{"e21", "r0", true, false},
+		ancestryItem{"e21", "r1", false, false},
+		ancestryItem{"e10", "r0", false, false},
+		ancestryItem{"s20", "r2", false, false},
+		ancestryItem{"e02", "r2", false, false},
+		ancestryItem{"e21", "r2", false, false},
 	}
 
 	for _, exp := range expected {
@@ -1215,6 +1233,7 @@ func TestDivideRoundsBis(t *testing.T) {
 	type tr struct {
 		t, r int
 	}
+
 	expectedTimestamps := map[string]tr{
 		"e0":   tr{0, 0},
 		"e1":   tr{0, 0},
@@ -1251,12 +1270,15 @@ func TestDivideRoundsBis(t *testing.T) {
 
 	for e, et := range expectedTimestamps {
 		ev, err := h.Store.GetEvent(index[e])
+
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if r := ev.round; r == nil || *r != et.r {
 			t.Fatalf("%s round should be %d, not %d", e, et.r, *r)
 		}
+
 		if ts := ev.lamportTimestamp; ts == nil || *ts != et.t {
 			t.Fatalf("%s lamportTimestamp should be %d, not %d", e, et.t, *ts)
 		}
@@ -1773,6 +1795,7 @@ func TestResetFromFrame(t *testing.T) {
 	}
 
 	known := h2.Store.KnownEvents()
+
 	for _, peer := range h2.Participants.ById {
 		if l := known[peer.ID]; l != expectedKnown[peer.ID] {
 			t.Fatalf("Known[%d] should be %d, not %d", peer.ID, expectedKnown[peer.ID], l)
@@ -1782,6 +1805,7 @@ func TestResetFromFrame(t *testing.T) {
 	/***************************************************************************
 	 Test DivideRounds
 	***************************************************************************/
+
 	if err := h2.DivideRounds(); err != nil {
 		t.Fatal(err)
 	}
@@ -1849,6 +1873,7 @@ func TestResetFromFrame(t *testing.T) {
 	Test continue after Reset
 	***************************************************************************/
 	//Insert remaining Events into the Reset hashgraph
+
 	for r := 2; r <= 4; r++ {
 		round, err := h.Store.GetRound(r)
 		if err != nil {

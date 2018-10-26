@@ -56,66 +56,81 @@ func (pec *ParticipantEventsCache) participantID(participant string) (int, error
 //return participant events with index > skip
 func (pec *ParticipantEventsCache) Get(participant string, skipIndex int) ([]string, error) {
 	id, err := pec.participantID(participant)
+
 	if err != nil {
 		return []string{}, err
 	}
 
 	pe, err := pec.rim.Get(id, skipIndex)
+
 	if err != nil {
 		return []string{}, err
 	}
 
 	res := make([]string, len(pe))
+
 	for k := 0; k < len(pe); k++ {
 		res[k] = pe[k].(string)
 	}
+
 	return res, nil
 }
 
 func (pec *ParticipantEventsCache) GetItem(participant string, index int) (string, error) {
 	id, err := pec.participantID(participant)
+
 	if err != nil {
 		return "", err
 	}
 
 	item, err := pec.rim.GetItem(id, index)
+
 	if err != nil {
 		return "", err
 	}
+
 	return item.(string), nil
 }
 
 func (pec *ParticipantEventsCache) GetLast(participant string) (string, error) {
 	id, err := pec.participantID(participant)
+
 	if err != nil {
 		return "", err
 	}
 
 	last, err := pec.rim.GetLast(id)
+
 	if err != nil {
 		return "", err
 	}
+
 	return last.(string), nil
 }
 
 func (pec *ParticipantEventsCache) GetLastConsensus(participant string) (string, error) {
 	id, err := pec.participantID(participant)
+
 	if err != nil {
 		return "", err
 	}
 
 	last, err := pec.rim.GetLast(id)
+
 	if err != nil {
 		return "", err
 	}
+
 	return last.(string), nil
 }
 
 func (pec *ParticipantEventsCache) Set(participant string, hash string, index int) error {
 	id, err := pec.participantID(participant)
+
 	if err != nil {
 		return err
 	}
+
 	return pec.rim.Set(id, hash, index)
 }
 
@@ -126,6 +141,10 @@ func (pec *ParticipantEventsCache) Known() map[int]int {
 
 func (pec *ParticipantEventsCache) Reset() error {
 	return pec.rim.Reset()
+}
+
+func (pec *ParticipantEventsCache) Import(other *ParticipantEventsCache) {
+	pec.rim.Import(other.rim)
 }
 
 //------------------------------------------------------------------------------
@@ -155,32 +174,39 @@ func (psc *ParticipantBlockSignaturesCache) participantID(participant string) (i
 //return participant BlockSignatures where index > skip
 func (psc *ParticipantBlockSignaturesCache) Get(participant string, skipIndex int) ([]BlockSignature, error) {
 	id, err := psc.participantID(participant)
+
 	if err != nil {
 		return []BlockSignature{}, err
 	}
 
 	ps, err := psc.rim.Get(id, skipIndex)
+
 	if err != nil {
 		return []BlockSignature{}, err
 	}
 
 	res := make([]BlockSignature, len(ps))
+
 	for k := 0; k < len(ps); k++ {
 		res[k] = ps[k].(BlockSignature)
 	}
+
 	return res, nil
 }
 
 func (psc *ParticipantBlockSignaturesCache) GetItem(participant string, index int) (BlockSignature, error) {
 	id, err := psc.participantID(participant)
+
 	if err != nil {
 		return BlockSignature{}, err
 	}
 
 	item, err := psc.rim.GetItem(id, index)
+
 	if err != nil {
 		return BlockSignature{}, err
 	}
+
 	return item.(BlockSignature), nil
 }
 
@@ -196,6 +222,7 @@ func (psc *ParticipantBlockSignaturesCache) GetLast(participant string) (BlockSi
 
 func (psc *ParticipantBlockSignaturesCache) Set(participant string, sig BlockSignature) error {
 	id, err := psc.participantID(participant)
+
 	if err != nil {
 		return err
 	}
