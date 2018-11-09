@@ -809,3 +809,42 @@ func BenchmarkGossip(b *testing.B) {
 		gossip(nodes, 50, true, 3*time.Second)
 	}
 }
+
+func TestPeerJoinRequest(t *testing.T) {
+	logger := common.NewTestLogger(t)
+
+	keys, peerSet := initPeers(4)
+	nodes := initNodes(keys, peerSet, 1000, 1000, "inmem", logger, t)
+
+	runNodes(nodes, true)
+
+	target := 50
+
+	err := bombardAndWait(nodes, target, 3*time.Second)
+	if err != nil {
+		t.Fatal("Error bombarding: ", err)
+	}
+	// go func() {
+	// 	for block := range nodes[0].commitCh {
+	// 		fmt.Println(block.PeerSet.Len())
+	// 	}
+	// }()
+
+	key, _ := crypto.GenerateECDSAKey()
+	peer := peers.NewPeer(
+		fmt.Sprintf("0x%X", crypto.FromECDSAPub(&key.PublicKey)),
+		fmt.Sprint("127.0.0.1:42"),
+	)
+
+	nodes[0].addInternalTransaction(hg.NewInternalTransaction(hg.PEER_ADD, *peer))
+
+	target = 140
+
+	err = bombardAndWait(nodes, target, 10*time.Second)
+	if err != nil {
+		t.Fatal("Error bombarding: ", err)
+	}
+
+	fmt.Println(nodes[0].core.peers.Len())
+
+}

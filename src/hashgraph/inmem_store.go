@@ -10,7 +10,7 @@ import (
 type InmemStore struct {
 	cacheSize              int
 	eventCache             *cm.LRU
-	roundCache             *cm.LRU
+	roundCreatedCache      *cm.LRU
 	blockCache             *cm.LRU
 	frameCache             *cm.LRU
 	consensusCache         *cm.RollingIndex
@@ -39,7 +39,7 @@ func NewInmemStore(peerSet *peers.PeerSet, cacheSize int) *InmemStore {
 	return &InmemStore{
 		cacheSize:              cacheSize,
 		eventCache:             cm.NewLRU(cacheSize, nil),
-		roundCache:             cm.NewLRU(cacheSize, nil),
+		roundCreatedCache:      cm.NewLRU(cacheSize, nil),
 		blockCache:             cm.NewLRU(cacheSize, nil),
 		frameCache:             cm.NewLRU(cacheSize, nil),
 		consensusCache:         cm.NewRollingIndex("ConsensusCache", cacheSize),
@@ -218,16 +218,32 @@ func (s *InmemStore) AddConsensusEvent(event *Event) error {
 	return nil
 }
 
-func (s *InmemStore) GetRound(r int) (*RoundInfo, error) {
-	res, ok := s.roundCache.Get(r)
+func (s *InmemStore) GetRoundCreated(r int) (*RoundCreated, error) {
+	res, ok := s.roundCreatedCache.Get(r)
 	if !ok {
-		return nil, cm.NewStoreErr("RoundCache", cm.KeyNotFound, strconv.Itoa(r))
+		return nil, cm.NewStoreErr("RoundCreatedCache", cm.KeyNotFound, strconv.Itoa(r))
 	}
-	return res.(*RoundInfo), nil
+	return res.(*RoundCreated), nil
 }
 
-func (s *InmemStore) SetRound(r int, round *RoundInfo) error {
-	s.roundCache.Add(r, round)
+func (s *InmemStore) SetRoundCreated(r int, round *RoundCreated) error {
+	s.roundCreatedCache.Add(r, round)
+	if r > s.lastRound {
+		s.lastRound = r
+	}
+	return nil
+}
+
+func (s *InmemStore) GetRoundReceived(r int) (*RoundReceived, error) {
+	res, ok := s.roundReceivedCache.Get(r)
+	if !ok {
+		return nil, cm.NewStoreErr("RoundReceivedCache", cm.KeyNotFound, strconv.Itoa(r))
+	}
+	return res.(*RoundReceived), nil
+}
+
+func (s *InmemStore) SetRoundReceived(r int, round *RoundReceived) error {
+	s.roundReceivedCache.Add(r, round)
 	if r > s.lastRound {
 		s.lastRound = r
 	}
@@ -321,7 +337,7 @@ func (s *InmemStore) Reset(frame *Frame) error {
 
 	//Reset Events and Rounds caches
 	s.eventCache = cm.NewLRU(s.cacheSize, nil)
-	s.roundCache = cm.NewLRU(s.cacheSize, nil)
+	s.roundCreatedCache = cm.NewLRU(s.cacheSize, nil)
 	s.frameCache = cm.NewLRU(s.cacheSize, nil)
 	s.consensusCache = cm.NewRollingIndex("ConsensusCache", s.cacheSize)
 

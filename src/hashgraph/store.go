@@ -18,8 +18,10 @@ type Store interface {
 	ConsensusEvents() []string
 	ConsensusEventsCount() int
 	AddConsensusEvent(*Event) error
-	GetRound(int) (*RoundInfo, error)
-	SetRound(int, *RoundInfo) error
+	GetRoundCreated(int) (*RoundCreated, error)
+	SetRoundCreated(int, *RoundCreated) error
+	GetRoundReceived(int) (*RoundReceived, error)
+	SetRoundReceived(int, *RoundReceived) error
 	LastRound() int
 	RoundWitnesses(int) []string
 	RoundEvents(int) int

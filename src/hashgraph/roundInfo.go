@@ -27,40 +27,51 @@ type pendingRound struct {
 }
 
 type RoundEvent struct {
-	Witness bool
-	Famous  Trilean
+	RoundReceived int
+	Witness       bool
+	Famous        Trilean
 }
 
-type RoundInfo struct {
-	CreatedEvents  map[string]RoundEvent
-	ReceivedEvents []string
-	PeerSet        *peers.PeerSet
-	queued         bool
+type RoundCreated struct {
+	Events map[string]RoundEvent
+	// ReceivedEvents []string
+	PeerSet *peers.PeerSet
+	queued  bool
 }
 
-func NewRoundInfo(peers *peers.PeerSet) *RoundInfo {
-	return &RoundInfo{
-		CreatedEvents:  make(map[string]RoundEvent),
-		ReceivedEvents: []string{},
-		PeerSet:        peers,
+type RoundReceived []string
+
+func NewRoundCreated(peers *peers.PeerSet) *RoundCreated {
+	return &RoundCreated{
+		Events: make(map[string]RoundEvent),
+		// ReceivedEvents: []string{},
+		PeerSet: peers,
 	}
 }
 
-func (r *RoundInfo) AddCreatedEvent(x string, witness bool) {
-	_, ok := r.CreatedEvents[x]
+func (r *RoundCreated) AddCreatedEvent(x string, witness bool) {
+	_, ok := r.Events[x]
 	if !ok {
-		r.CreatedEvents[x] = RoundEvent{
+		r.Events[x] = RoundEvent{
 			Witness: witness,
 		}
 	}
 }
 
-func (r *RoundInfo) AddReceivedEvent(x string) {
-	r.ReceivedEvents = append(r.ReceivedEvents, x)
+func (r *RoundCreated) SetRoundReceived(x string, round int) {
+	e, ok := r.Events[x]
+
+	if !ok {
+		return
+	}
+
+	e.RoundReceived = round
+
+	r.Events[x] = e
 }
 
-func (r *RoundInfo) SetFame(x string, f bool) {
-	e, ok := r.CreatedEvents[x]
+func (r *RoundCreated) SetFame(x string, f bool) {
+	e, ok := r.Events[x]
 	if !ok {
 		e = RoundEvent{
 			Witness: true,
@@ -73,12 +84,12 @@ func (r *RoundInfo) SetFame(x string, f bool) {
 		e.Famous = False
 	}
 
-	r.CreatedEvents[x] = e
+	r.Events[x] = e
 }
 
 //return true if no witnesses' fame is left undefined
-func (r *RoundInfo) WitnessesDecided() bool {
-	for _, e := range r.CreatedEvents {
+func (r *RoundCreated) WitnessesDecided() bool {
+	for _, e := range r.Events {
 		if e.Witness && e.Famous == Undefined {
 			return false
 		}
@@ -87,9 +98,9 @@ func (r *RoundInfo) WitnessesDecided() bool {
 }
 
 //return witnesses
-func (r *RoundInfo) Witnesses() []string {
+func (r *RoundCreated) Witnesses() []string {
 	res := []string{}
-	for x, e := range r.CreatedEvents {
+	for x, e := range r.Events {
 		if e.Witness {
 			res = append(res, x)
 		}
@@ -99,9 +110,9 @@ func (r *RoundInfo) Witnesses() []string {
 }
 
 //return famous witnesses
-func (r *RoundInfo) FamousWitnesses() []string {
+func (r *RoundCreated) FamousWitnesses() []string {
 	res := []string{}
-	for x, e := range r.CreatedEvents {
+	for x, e := range r.Events {
 		if e.Witness && e.Famous == True {
 			res = append(res, x)
 		}
@@ -109,12 +120,12 @@ func (r *RoundInfo) FamousWitnesses() []string {
 	return res
 }
 
-func (r *RoundInfo) IsDecided(witness string) bool {
-	w, ok := r.CreatedEvents[witness]
+func (r *RoundCreated) IsDecided(witness string) bool {
+	w, ok := r.Events[witness]
 	return ok && w.Witness && w.Famous != Undefined
 }
 
-func (r *RoundInfo) Marshal() ([]byte, error) {
+func (r *RoundCreated) Marshal() ([]byte, error) {
 	b := new(bytes.Buffer)
 	jh := new(codec.JsonHandle)
 	jh.Canonical = true
@@ -127,7 +138,7 @@ func (r *RoundInfo) Marshal() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (r *RoundInfo) Unmarshal(data []byte) error {
+func (r *RoundCreated) Unmarshal(data []byte) error {
 	b := bytes.NewBuffer(data)
 	jh := new(codec.JsonHandle)
 	jh.Canonical = true
@@ -136,6 +147,6 @@ func (r *RoundInfo) Unmarshal(data []byte) error {
 	return dec.Decode(r)
 }
 
-func (r *RoundInfo) IsQueued() bool {
+func (r *RoundCreated) IsQueued() bool {
 	return r.queued
 }

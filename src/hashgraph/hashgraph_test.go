@@ -1443,19 +1443,27 @@ func TestDecideRoundReceived(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedReceivedEvents := map[int][]string{
-		0: []string{},
-		1: []string{index["e0"], index["e1"], index["e2"], index["e10"], index["e21"], index["e21b"], index["e02"]},
-		2: []string{index["f1"], index["f1b"], index["f0"], index["f2"], index["f10"], index["f0x"], index["f21"], index["f02"], index["f02b"]},
-		3: []string{},
-		4: []string{},
-	}
+	expectedReceivedEvents := map[int][]string{}
+	// expectedReceivedEvents := map[int][]string{
+	// 	0: []string{index["e0"], index["e1"], index["e2"], index["e10"], index["e21"], index["e21b"], index["e02"]},
+	// 	1: []string{index["f1"], index["f1b"], index["f0"], index["f2"], index["f10"], index["f0x"], index["f21"], index["f02"], index["f02b"]},
+	// 	2: []string{},
+	// 	3: []string{},
+	// 	4: []string{},
+	// }
 
 	for i := 0; i < 5; i++ {
 		round, err := h.Store.GetRound(i)
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		for hash, event := range round.Events {
+			if event.RoundReceived != i {
+
+			}
+		}
+
 		if !reflect.DeepEqual(expectedReceivedEvents[i], round.ReceivedEvents) {
 			t.Fatalf("Round[%d].ReceivedEvents should be %v, not %v", i, expectedReceivedEvents[i], round.ReceivedEvents)
 		}

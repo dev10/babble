@@ -107,8 +107,11 @@ func NewBlockFromFrame(blockIndex int, frame *Frame) (*Block, error) {
 	}
 
 	transactions := [][]byte{}
+	// internal_transactions := []InternalTransaction{}
+
 	for _, e := range frame.Events {
 		transactions = append(transactions, e.Transactions()...)
+		// internal_transactions = append(internal_transactions, e.InternalTransactions()...)
 	}
 
 	return NewBlock(blockIndex, frame.Round, frameHash, frame.Peers, transactions), nil
