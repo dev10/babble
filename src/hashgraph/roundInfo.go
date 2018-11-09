@@ -2,6 +2,7 @@ package hashgraph
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/mosaicnetworks/babble/src/peers"
 	"github.com/ugorji/go/codec"
@@ -31,6 +32,29 @@ type RoundEvent struct {
 	Witness       bool
 	Famous        Trilean
 }
+type RoundReceived []string
+
+func (r *RoundReceived) Marshal() ([]byte, error) {
+	b := new(bytes.Buffer)
+	jh := new(codec.JsonHandle)
+	jh.Canonical = true
+	enc := codec.NewEncoder(b, jh)
+
+	if err := enc.Encode(r); err != nil {
+		return nil, err
+	}
+
+	return b.Bytes(), nil
+}
+
+func (r *RoundReceived) Unmarshal(data []byte) error {
+	b := bytes.NewBuffer(data)
+	jh := new(codec.JsonHandle)
+	jh.Canonical = true
+	dec := codec.NewDecoder(b, jh)
+
+	return dec.Decode(r)
+}
 
 type RoundCreated struct {
 	Events map[string]RoundEvent
@@ -38,8 +62,6 @@ type RoundCreated struct {
 	PeerSet *peers.PeerSet
 	queued  bool
 }
-
-type RoundReceived []string
 
 func NewRoundCreated(peers *peers.PeerSet) *RoundCreated {
 	return &RoundCreated{
@@ -139,6 +161,7 @@ func (r *RoundCreated) Marshal() ([]byte, error) {
 }
 
 func (r *RoundCreated) Unmarshal(data []byte) error {
+	fmt.Println("OUAT THE FUCK", string(data))
 	b := bytes.NewBuffer(data)
 	jh := new(codec.JsonHandle)
 	jh.Canonical = true

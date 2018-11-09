@@ -434,11 +434,11 @@ func initRoundHashgraph(t *testing.T) (*Hashgraph, map[string]string) {
 	round0Witnesses[index["e0"]] = RoundEvent{Witness: true, Famous: Undefined}
 	round0Witnesses[index["e1"]] = RoundEvent{Witness: true, Famous: Undefined}
 	round0Witnesses[index["e2"]] = RoundEvent{Witness: true, Famous: Undefined}
-	h.Store.SetRound(0, &RoundInfo{CreatedEvents: round0Witnesses, PeerSet: lastPeerSet})
+	h.Store.SetRoundCreated(0, &RoundCreated{Events: round0Witnesses, PeerSet: lastPeerSet})
 
 	round1Witnesses := make(map[string]RoundEvent)
 	round1Witnesses[index["f1"]] = RoundEvent{Witness: true, Famous: Undefined}
-	h.Store.SetRound(1, &RoundInfo{CreatedEvents: round1Witnesses, PeerSet: lastPeerSet})
+	h.Store.SetRoundCreated(1, &RoundCreated{Events: round1Witnesses, PeerSet: lastPeerSet})
 
 	return h, index
 }
@@ -750,9 +750,9 @@ func TestDivideRounds(t *testing.T) {
 		t.Fatalf("last round should be 1 not %d", l)
 	}
 
-	expectedRounds := map[int]*RoundInfo{
-		0: &RoundInfo{
-			CreatedEvents: map[string]RoundEvent{
+	expectedRounds := map[int]*RoundCreated{
+		0: &RoundCreated{
+			Events: map[string]RoundEvent{
 				index["e0"]:  RoundEvent{Witness: true, Famous: Undefined},
 				index["e1"]:  RoundEvent{Witness: true, Famous: Undefined},
 				index["e2"]:  RoundEvent{Witness: true, Famous: Undefined},
@@ -764,28 +764,28 @@ func TestDivideRounds(t *testing.T) {
 				index["s10"]: RoundEvent{Witness: false, Famous: Undefined},
 			},
 		},
-		1: &RoundInfo{
-			CreatedEvents: map[string]RoundEvent{
+		1: &RoundCreated{
+			Events: map[string]RoundEvent{
 				index["f1"]:  RoundEvent{Witness: true, Famous: Undefined},
 				index["s11"]: RoundEvent{Witness: false, Famous: Undefined},
 			},
 		},
 	}
 
-	round0, err := h.Store.GetRound(0)
+	round0, err := h.Store.GetRoundCreated(0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(expectedRounds[0].CreatedEvents, round0.CreatedEvents) {
-		t.Fatalf("Round[0].CreatedEvents should be %v, not %v", expectedRounds[0].CreatedEvents, round0.CreatedEvents)
+	if !reflect.DeepEqual(expectedRounds[0].Events, round0.Events) {
+		t.Fatalf("Round[0].Events should be %v, not %v", expectedRounds[0].Events, round0.Events)
 	}
 
-	round1, err := h.Store.GetRound(1)
+	round1, err := h.Store.GetRoundCreated(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(expectedRounds[1].CreatedEvents, round1.CreatedEvents) {
-		t.Fatalf("Round[1].CreatedEvents should be %v, not %v", expectedRounds[1].CreatedEvents, round1.CreatedEvents)
+	if !reflect.DeepEqual(expectedRounds[1].Events, round1.Events) {
+		t.Fatalf("Round[1].Events should be %v, not %v", expectedRounds[1].Events, round1.Events)
 	}
 
 	expectedPendingRounds := []pendingRound{
@@ -930,7 +930,7 @@ func initDentedHashgraph(t *testing.T) (*Hashgraph, map[string]string) {
 	round0Witnesses[index["e0"]] = RoundEvent{Witness: true, Famous: Undefined}
 	round0Witnesses[index["e12"]] = RoundEvent{Witness: true, Famous: Undefined}
 	round0Witnesses[index["e2"]] = RoundEvent{Witness: true, Famous: Undefined}
-	h.Store.SetRound(0, &RoundInfo{CreatedEvents: round0Witnesses, PeerSet: participants})
+	h.Store.SetRoundCreated(0, &RoundCreated{Events: round0Witnesses, PeerSet: participants})
 
 	return h, index
 }
@@ -1236,7 +1236,7 @@ func TestDivideRoundsBis(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedCreatedEvents := map[int]map[string]RoundEvent{
+	expectedEvents := map[int]map[string]RoundEvent{
 		0: map[string]RoundEvent{
 			index["e0"]:   RoundEvent{Witness: true, Famous: Undefined},
 			index["e1"]:   RoundEvent{Witness: true, Famous: Undefined},
@@ -1281,12 +1281,12 @@ func TestDivideRoundsBis(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		round, err := h.Store.GetRound(i)
+		round, err := h.Store.GetRoundCreated(i)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(expectedCreatedEvents[i], round.CreatedEvents) {
-			t.Fatalf("Round[%d].CreatedEvents should be %v, not %v", i, expectedCreatedEvents[i], round.CreatedEvents)
+		if !reflect.DeepEqual(expectedEvents[i], round.Events) {
+			t.Fatalf("Round[%d].Events should be %v, not %v", i, expectedEvents[i], round.Events)
 		}
 	}
 
@@ -1351,7 +1351,7 @@ func TestDecideFame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedCreatedEvents := map[int]map[string]RoundEvent{
+	expectedEvents := map[int]map[string]RoundEvent{
 		0: map[string]RoundEvent{
 			index["e0"]:   RoundEvent{Witness: true, Famous: True},
 			index["e1"]:   RoundEvent{Witness: true, Famous: True},
@@ -1396,12 +1396,12 @@ func TestDecideFame(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		round, err := h.Store.GetRound(i)
+		round, err := h.Store.GetRoundCreated(i)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(expectedCreatedEvents[i], round.CreatedEvents) {
-			t.Fatalf("Round[%d].CreatedEvents should be %v, not %v", i, expectedCreatedEvents[i], round.CreatedEvents)
+		if !reflect.DeepEqual(expectedEvents[i], round.Events) {
+			t.Fatalf("Round[%d].Events should be %v, not %v", i, expectedEvents[i], round.Events)
 		}
 	}
 
@@ -1443,29 +1443,19 @@ func TestDecideRoundReceived(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedReceivedEvents := map[int][]string{}
-	// expectedReceivedEvents := map[int][]string{
-	// 	0: []string{index["e0"], index["e1"], index["e2"], index["e10"], index["e21"], index["e21b"], index["e02"]},
-	// 	1: []string{index["f1"], index["f1b"], index["f0"], index["f2"], index["f10"], index["f0x"], index["f21"], index["f02"], index["f02b"]},
-	// 	2: []string{},
-	// 	3: []string{},
-	// 	4: []string{},
-	// }
+	expectedEvents := map[int]RoundReceived{
+		1: RoundReceived{index["e0"], index["e1"], index["e2"], index["e10"], index["e21"], index["e21b"], index["e02"]},
+		2: RoundReceived{index["f1"], index["f1b"], index["f0"], index["f2"], index["f10"], index["f0x"], index["f21"], index["f02"], index["f02b"]},
+	}
 
-	for i := 0; i < 5; i++ {
-		round, err := h.Store.GetRound(i)
+	for i := 1; i < 3; i++ {
+		round, err := h.Store.GetRoundReceived(i)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		for hash, event := range round.Events {
-			if event.RoundReceived != i {
-
-			}
-		}
-
-		if !reflect.DeepEqual(expectedReceivedEvents[i], round.ReceivedEvents) {
-			t.Fatalf("Round[%d].ReceivedEvents should be %v, not %v", i, expectedReceivedEvents[i], round.ReceivedEvents)
+		if !reflect.DeepEqual(expectedEvents[i], *round) {
+			t.Fatalf("Round[%d].Events should be %v, not %v", i, expectedEvents[i], *round)
 		}
 	}
 
@@ -1603,6 +1593,11 @@ func TestProcessDecidedRounds(t *testing.T) {
 		if !reflect.DeepEqual(*pd, expectedpendingRounds[i]) {
 			t.Fatalf("pendingRounds[%d] should be %v, not %v", i, expectedpendingRounds[i], *pd)
 		}
+	}
+
+	// pendingRoundsReceived -----------------------------------------------------------
+	if len(h.PendingRoundReceived) != 0 {
+		t.Fatalf("pendingRounds should be %v, not %v", 0, len(h.PendingRoundReceived))
 	}
 
 	//Anchor -------------------------------------------------------------------
@@ -1879,11 +1874,11 @@ func TestResetFromFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hRound1, err := h.Store.GetRound(1)
+	hRound1, err := h.Store.GetRoundCreated(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	h2Round1, err := h2.Store.GetRound(1)
+	h2Round1, err := h2.Store.GetRoundCreated(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1943,13 +1938,13 @@ func TestResetFromFrame(t *testing.T) {
 	***************************************************************************/
 	//Insert remaining Events into the Reset hashgraph
 	for r := 2; r <= 4; r++ {
-		round, err := h.Store.GetRound(r)
+		round, err := h.Store.GetRoundCreated(r)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		events := []*Event{}
-		for e := range round.CreatedEvents {
+		for e := range round.Events {
 			ev, err := h.Store.GetEvent(e)
 			if err != nil {
 				t.Fatal(err)
@@ -1986,11 +1981,11 @@ func TestResetFromFrame(t *testing.T) {
 	}
 
 	for r := 1; r <= 4; r++ {
-		hRound, err := h.Store.GetRound(r)
+		hRound, err := h.Store.GetRoundCreated(r)
 		if err != nil {
 			t.Fatal(err)
 		}
-		h2Round, err := h2.Store.GetRound(r)
+		h2Round, err := h2.Store.GetRoundCreated(r)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2197,7 +2192,7 @@ func TestFunkyHashgraphFame(t *testing.T) {
 	}
 
 	for r := 0; r < 5; r++ {
-		round, err := h.Store.GetRound(r)
+		round, err := h.Store.GetRoundCreated(r)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2277,7 +2272,7 @@ func TestFunkyHashgraphBlocks(t *testing.T) {
 	}
 
 	for r := 0; r < 6; r++ {
-		round, err := h.Store.GetRound(r)
+		round, err := h.Store.GetRoundCreated(r)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2848,11 +2843,11 @@ func TestSparseHashgraphReset(t *testing.T) {
 func compareRoundWitnesses(h, h2 *Hashgraph, index map[string]string, round int, check bool, t *testing.T) {
 
 	for i := round; i <= 5; i++ {
-		hRound, err := h.Store.GetRound(i)
+		hRound, err := h.Store.GetRoundCreated(i)
 		if err != nil {
 			t.Fatal(err)
 		}
-		h2Round, err := h2.Store.GetRound(i)
+		h2Round, err := h2.Store.GetRoundCreated(i)
 		if err != nil {
 			t.Fatal(err)
 		}

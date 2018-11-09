@@ -269,7 +269,7 @@ func TestR2DynDivideRounds(t *testing.T) {
 	}
 
 	for i := 0; i < 8; i++ {
-		round, err := h.Store.GetRound(i)
+		round, err := h.Store.GetRoundCreated(i)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -344,15 +344,15 @@ func TestR2DynDecideFame(t *testing.T) {
 	}
 
 	for i := 0; i < 8; i++ {
-		round, err := h.Store.GetRound(i)
+		round, err := h.Store.GetRoundCreated(i)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if l := len(round.CreatedEvents); l != len(expectedEvents[i]) {
-			t.Fatalf("Round[%d].CreatedEvents should contain %d items, not %d", i, len(expectedEvents[i]), l)
+		if l := len(round.Events); l != len(expectedEvents[i]) {
+			t.Fatalf("Round[%d].Events should contain %d items, not %d", i, len(expectedEvents[i]), l)
 		}
 		for w, re := range expectedEvents[i] {
-			if f := round.CreatedEvents[index[w]]; !reflect.DeepEqual(f, re) {
+			if f := round.Events[index[w]]; !reflect.DeepEqual(f, re) {
 				t.Fatalf("%s should be %v; got %v", w, re, f)
 			}
 		}
@@ -369,24 +369,21 @@ func TestR2DynDecideRoundReceived(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedConsensusEvents := map[int][]string{
-		0: []string{},
-		1: []string{index["w00"], index["w01"], index["w02"], index["e10"], index["e21"], index["e12"]},
-		2: []string{index["w11"], index["w12"], index["w10"], index["f10"]},
-		3: []string{index["w22"], index["w20"], index["w21"], index["g21"]},
-		4: []string{index["w33"], index["w30"], index["w31"], index["w32"]},
-		5: []string{index["w43"], index["w40"], index["w41"], index["w42"]},
-		6: []string{},
-		7: []string{},
+	expectedConsensusEvents := map[int]RoundReceived{
+		1: RoundReceived{index["w00"], index["w01"], index["w02"], index["e10"], index["e21"], index["e12"]},
+		2: RoundReceived{index["w11"], index["w12"], index["w10"], index["f10"]},
+		3: RoundReceived{index["w22"], index["w20"], index["w21"], index["g21"]},
+		4: RoundReceived{index["w33"], index["w30"], index["w31"], index["w32"]},
+		5: RoundReceived{index["w43"], index["w40"], index["w41"], index["w42"]},
 	}
 
-	for i := 0; i < 8; i++ {
-		round, err := h.Store.GetRound(i)
+	for i := 1; i < 6; i++ {
+		round, err := h.Store.GetRoundReceived(i)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(round.ReceivedEvents, expectedConsensusEvents[i]) {
-			t.Fatalf("Round[%d].ReceivedEvents should be %v, %v", i, expectedConsensusEvents[i], round.ReceivedEvents)
+		if !reflect.DeepEqual(*round, expectedConsensusEvents[i]) {
+			t.Fatalf("Round[%d].ReceivedEvents should be %v, %v", i, expectedConsensusEvents[i], *round)
 		}
 	}
 
