@@ -310,7 +310,6 @@ func initNodes(keys []*ecdsa.PrivateKey,
 		peer := peers.ByPubKey[key]
 		id := peer.ID
 
-		//XXX
 		conf := NewConfig(
 			5*time.Millisecond,
 			time.Second,
@@ -409,6 +408,24 @@ func shutdownNodes(nodes []*Node) {
 	}
 }
 
+func drawGraphs(nodes []*Node, t *testing.T) {
+	os.RemoveAll("test_data")
+	os.Mkdir("test_data", os.ModeDir|0777)
+	for _, n := range nodes {
+		graph := NewGraph(n)
+		info, err := graph.GetInfos()
+		if err != nil {
+			t.Logf("ERROR drawing graph: %s", err)
+			continue
+		}
+		jinfo, err := json.Marshal(info)
+		err = ioutil.WriteFile(fmt.Sprintf("test_data/info%d", n.ID()), jinfo, 0644)
+		if err != nil {
+			t.Log(err)
+		}
+	}
+}
+
 func deleteStores(nodes []*Node, t *testing.T) {
 	for _, n := range nodes {
 		if err := os.RemoveAll(n.core.hg.Store.StorePath()); err != nil {
@@ -501,7 +518,7 @@ func (s *Service) GetGraph(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 
-	res := s.graph.GetInfos()
+	res, _ := s.graph.GetInfos()
 
 	encoder.Encode(res)
 }
@@ -512,8 +529,9 @@ func TestGossip(t *testing.T) {
 	keys, peers := initPeers(4)
 	nodes := initNodes(keys, peers, 1000, 1000, "inmem", logger, t)
 
-	target := 50
+	defer drawGraphs(nodes, t)
 
+	target := 50
 	err := gossip(nodes, target, true, 3*time.Second)
 	if err != nil {
 		t.Fatal(err)
@@ -527,14 +545,16 @@ func TestGossip(t *testing.T) {
 }
 
 func TestMissingNodeGossip(t *testing.T) {
-
 	logger := common.NewTestLogger(t)
 
 	keys, peers := initPeers(4)
 	nodes := initNodes(keys, peers, 1000, 1000, "inmem", logger, t)
+
 	defer shutdownNodes(nodes)
 
-	err := gossip(nodes[1:], 10, true, 3*time.Second)
+	defer drawGraphs(nodes, t)
+
+	err := gossip(nodes[1:], 10, true, 6*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -585,7 +605,6 @@ func TestSyncLimit(t *testing.T) {
 }
 
 func TestFastForward(t *testing.T) {
-
 	logger := common.NewTestLogger(t)
 
 	keys, peers := initPeers(4)
@@ -593,7 +612,7 @@ func TestFastForward(t *testing.T) {
 	defer shutdownNodes(nodes)
 
 	target := 50
-	err := gossip(nodes[1:], target, false, 3*time.Second)
+	err := gossip(nodes[1:], target, false, 6*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -632,7 +651,7 @@ func TestCatchUp(t *testing.T) {
 
 	target := 50
 
-	err := gossip(normalNodes, target, false, 3*time.Second)
+	err := gossip(normalNodes, target, false, 6*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -676,7 +695,10 @@ func TestFastSync(t *testing.T) {
 	//Create  config for 4 nodes
 	keys, peers := initPeers(4)
 	nodes := initNodes(keys, peers, 1000, 400, "inmem", logger, t)
+
 	defer shutdownNodes(nodes)
+
+	defer drawGraphs(nodes, t)
 
 	target := 50
 
@@ -800,7 +822,7 @@ func bombardAndWait(nodes []*Node, target int, timeout time.Duration) error {
 	for {
 		select {
 		case <-stopper:
-			return fmt.Errorf("timeout")
+			return fmt.Errorf("TIMEOUT")
 		default:
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -829,7 +851,6 @@ func bombardAndWait(nodes []*Node, target int, timeout time.Duration) error {
 }
 
 func checkGossip(nodes []*Node, fromBlock int, t *testing.T) {
-
 	nodeBlocks := map[int][]*hg.Block{}
 	for _, n := range nodes {
 		blocks := []*hg.Block{}
