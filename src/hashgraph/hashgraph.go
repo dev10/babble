@@ -1056,10 +1056,10 @@ func (h *Hashgraph) DecideRoundReceived() error {
 
 				ex.SetRoundReceived(i)
 
-				err = h.Store.SetEvent(ex)
-				if err != nil {
-					return err
-				}
+				// err = h.Store.SetEvent(ex)
+				// if err != nil {
+				// 	return err
+				// }
 
 				roundReceived, err := h.Store.GetRoundReceived(i)
 				if err != nil {
@@ -1115,7 +1115,7 @@ func (h *Hashgraph) ProcessDecidedRounds() error {
 		h.PendingRoundReceived = h.PendingRoundReceived[processedIndex:]
 	}()
 
-	for _, i := range h.PendingRoundReceived {
+	for _, r := range h.PendingRoundReceived {
 		//Although it is possible for a Round to be 'decided' before a previous
 		//round, we should NEVER process a decided round before all the previous
 		//rounds are processed.
@@ -1128,13 +1128,13 @@ func (h *Hashgraph) ProcessDecidedRounds() error {
 		//Indeed, after a Reset, LastConsensusRound is added to PendingRounds,
 		//but its ConsensusEvents (which are necessarily 'under' this Round) are
 		//already deemed committed. Hence, skip this Round after a Reset.
-		if h.LastConsensusRound != nil && i == *h.LastConsensusRound {
+		if h.LastConsensusRound != nil && r == *h.LastConsensusRound {
 			continue
 		}
 
-		frame, err := h.GetFrame(i)
+		frame, err := h.GetFrame(r)
 		if err != nil {
-			return fmt.Errorf("Getting Frame %d: %v", i, err)
+			return fmt.Errorf("Getting Frame %d: %v", r, err)
 		}
 
 		// round, err := h.Store.GetRoundCreated(r.Index)
@@ -1143,7 +1143,7 @@ func (h *Hashgraph) ProcessDecidedRounds() error {
 		// }
 
 		h.logger.WithFields(logrus.Fields{
-			"round_received": i,
+			"round_received": r,
 			"events":         len(frame.Events),
 			"roots":          frame.Roots,
 			// "witnesses":      round.FamousWitnesses(),
@@ -1180,13 +1180,13 @@ func (h *Hashgraph) ProcessDecidedRounds() error {
 				}
 			}
 		} else {
-			h.logger.Debugf("No Events to commit for ConsensusRound %d", i)
+			h.logger.Debugf("No Events to commit for ConsensusRound %d", r)
 		}
 
 		processedIndex++
 
-		if h.LastConsensusRound == nil || i > *h.LastConsensusRound {
-			h.setLastConsensusRound(i)
+		if h.LastConsensusRound == nil || r > *h.LastConsensusRound {
+			h.setLastConsensusRound(r)
 		}
 
 	}
@@ -1430,7 +1430,7 @@ func (h *Hashgraph) Reset(block *Block, frame *Frame) error {
 	h.ancestorCache = common.NewLRU(cacheSize, nil)
 	h.selfAncestorCache = common.NewLRU(cacheSize, nil)
 	h.stronglySeeCache = common.NewLRU(cacheSize, nil)
-	// h.roundCreatedCache = common.NewLRU(cacheSize, nil)
+	h.roundCache = common.NewLRU(cacheSize, nil)
 
 	//Initialize new Roots
 	if err := h.Store.Reset(frame); err != nil {
@@ -1502,7 +1502,11 @@ func (h *Hashgraph) ReadWireInfo(wevent WireEvent) (*Event, error) {
 	otherParent := ""
 	var err error
 
-	creator := h.Store.RepertoireByID()[wevent.Body.CreatorID]
+	creator, _ := h.Store.RepertoireByID()[wevent.Body.CreatorID]
+	// if !ok {
+	// 	return nil, fmt.Errorf("Cannot find creator: %d", wevent.Body.CreatorID)
+	// }
+
 	creatorBytes, err := hex.DecodeString(creator.PubKeyHex[2:])
 	if err != nil {
 		return nil, err

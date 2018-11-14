@@ -221,7 +221,9 @@ func (c *Core) Sync(unknownEvents []hg.WireEvent) error {
 
 			return err
 		}
+
 		if err := c.InsertEvent(ev, false); err != nil {
+			c.logger.Error("SYNC: INSERT ERR", err)
 			return err
 		}
 

@@ -11,13 +11,13 @@ import (
 )
 
 const (
-	participantPrefix  = "participant"
-	rootSuffix         = "root"
-	roundPrefix        = "round"
-	roundCreatedPrefix = "roundCreated"
-	topoPrefix         = "topo"
-	blockPrefix        = "block"
-	framePrefix        = "frame"
+	participantPrefix   = "participant"
+	rootSuffix          = "root"
+	roundCreatedPrefix  = "roundCreated"
+	roundReceivedPrefix = "roundReceived"
+	topoPrefix          = "topo"
+	blockPrefix         = "block"
+	framePrefix         = "frame"
 )
 
 type BadgerStore struct {
@@ -142,12 +142,12 @@ func participantRootKey(participant string) []byte {
 	return []byte(fmt.Sprintf("%s_%s", participant, rootSuffix))
 }
 
-func roundKey(index int) []byte {
-	return []byte(fmt.Sprintf("%s_%09d", roundPrefix, index))
-}
-
 func roundCreatedKey(index int) []byte {
 	return []byte(fmt.Sprintf("%s_%09d", roundCreatedPrefix, index))
+}
+
+func roundReceivedKey(index int) []byte {
+	return []byte(fmt.Sprintf("%s_%09d", roundReceivedPrefix, index))
 }
 
 func blockKey(index int) []byte {
@@ -275,7 +275,7 @@ func (s *BadgerStore) GetRoundCreated(r int) (*RoundCreated, error) {
 	if err != nil {
 		res, err = s.dbGetRoundCreated(r)
 	}
-	return res, mapError(err, "RoundCreated", string(roundKey(r)))
+	return res, mapError(err, "RoundCreated", string(roundCreatedKey(r)))
 }
 
 func (s *BadgerStore) SetRoundCreated(r int, round *RoundCreated) error {
@@ -290,7 +290,7 @@ func (s *BadgerStore) GetRoundReceived(r int) (*RoundReceived, error) {
 	if err != nil {
 		res, err = s.dbGetRoundReceived(r)
 	}
-	return res, mapError(err, "RoundReceived", string(roundKey(r)))
+	return res, mapError(err, "RoundReceived", string(roundReceivedKey(r)))
 }
 
 func (s *BadgerStore) SetRoundReceived(r int, round *RoundReceived) error {
@@ -574,7 +574,7 @@ func (s *BadgerStore) dbGetRoot(participant string) (*Root, error) {
 
 func (s *BadgerStore) dbGetRoundCreated(index int) (*RoundCreated, error) {
 	var roundBytes []byte
-	key := roundKey(index)
+	key := roundCreatedKey(index)
 	err := s.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil {
@@ -600,7 +600,7 @@ func (s *BadgerStore) dbSetRoundCreated(index int, round *RoundCreated) error {
 	tx := s.db.NewTransaction(true)
 	defer tx.Discard()
 
-	key := roundKey(index)
+	key := roundCreatedKey(index)
 	val, err := round.Marshal()
 	if err != nil {
 		return err
@@ -616,7 +616,7 @@ func (s *BadgerStore) dbSetRoundCreated(index int, round *RoundCreated) error {
 
 func (s *BadgerStore) dbGetRoundReceived(index int) (*RoundReceived, error) {
 	var roundBytes []byte
-	key := roundCreatedKey(index)
+	key := roundReceivedKey(index)
 	err := s.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil {
@@ -642,7 +642,7 @@ func (s *BadgerStore) dbSetRoundReceived(index int, round *RoundReceived) error 
 	tx := s.db.NewTransaction(true)
 	defer tx.Discard()
 
-	key := roundCreatedKey(index)
+	key := roundReceivedKey(index)
 	val, err := round.Marshal()
 	if err != nil {
 		return err
